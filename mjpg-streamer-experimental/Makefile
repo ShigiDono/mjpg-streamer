@@ -32,17 +32,18 @@ LFLAGS += -lpthread -ldl
 APP_BINARY = mjpg_streamer
 
 # define the names and targets of the plugins
+PLUGINS = input_phenox.so
 PLUGINS = input_uvc.so
-#PLUGINS += output_file.so
-#PLUGINS += output_udp.so
+PLUGINS += output_file.so
+PLUGINS += output_udp.so
 PLUGINS += output_http.so
-#PLUGINS += input_testpicture.so
+PLUGINS += input_testpicture.so
 #PLUGINS += output_autofocus.so
 #PLUGINS += input_file.so
 # PLUGINS += input_pylon.so
 # PLUGINS += input_megatec.so
 # PLUGINS += output_mars2020.so
-# PLUGINS += output_rtsp.so
+PLUGINS += output_rtsp.so
 # PLUGINS += input_ptp2.so # commented out because it depends on libgphoto
 #PLUGINS += input_http.so 
 # PLUGINS += output_viewer.so # commented out because it depends on SDL
@@ -62,6 +63,10 @@ plugins: $(PLUGINS)
 $(APP_BINARY): mjpg_streamer.c mjpg_streamer.h mjpg_streamer.o utils.c utils.h utils.o
 	$(CC) $(CFLAGS) $(OBJECTS) $(LFLAGS) -o $(APP_BINARY)
 	chmod 755 $(APP_BINARY)
+
+input_phenox.so: mjpg_streamer.h utils.h
+	make -C plugins/input_phenox all
+	cp plugins/input_phenox/input_phenox.so .
 
 output_autofocus.so: mjpg_streamer.h utils.h
 	make -C plugins/output_autofocus all
@@ -139,6 +144,7 @@ output_viewer.so: mjpg_streamer.h utils.h
 
 # cleanup
 clean:
+	make -C plugins/input_phenox $@
 	make -C plugins/input_uvc $@
 	make -C plugins/input_testpicture $@
 	make -C plugins/output_file $@
