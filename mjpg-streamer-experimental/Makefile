@@ -33,7 +33,7 @@ APP_BINARY = mjpg_streamer
 
 # define the names and targets of the plugins
 PLUGINS = input_phenox.so
-PLUGINS = input_uvc.so
+PLUGINS += input_uvc.so
 PLUGINS += output_file.so
 PLUGINS += output_udp.so
 PLUGINS += output_http.so
