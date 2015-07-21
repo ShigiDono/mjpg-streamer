@@ -114,12 +114,6 @@ void *timer_handler(void *ptr) {
         px_selfstate st;
         pxget_selfstate(&st);
         
-        static unsigned long msec_cnt = 0;
-        msec_cnt++;
-        if(!(msec_cnt % 3)){
-            //printf("%.2f %.2f %.2f | %.2f %.2f %.2f | %.2f | %d\n",st.degx,st.degy,st.degz,st.vision_tx,st.vision_ty,st.vision_tz,st.height,0);
-        } 
-
         static int prev_operatemode = PX_HALT;
         if((prev_operatemode == PX_UP) && (pxget_operate_mode() == PX_HOVER)) {
             pxset_visioncontrol_xy(st.vision_tx,st.vision_ty);
@@ -224,6 +218,7 @@ int input_init(input_parameter *param, int plugin_no)
             DBG("case 2,3\n");
             cameraid = atoi(optarg);
             if (cameraid != 0 && cameraid != 1) {
+                help();
                 return 1;
             }
             break;
@@ -233,6 +228,10 @@ int input_init(input_parameter *param, int plugin_no)
         case 5:
             DBG("case 4,5\n");
             jpegquality = atoi(optarg);
+            if (jpegquality > 100 || jpegquality < 1) {
+                help();
+                return 1;
+            }
 
             break;
 
@@ -301,8 +300,8 @@ void help(void)
     " Help for input plugin..: "INPUT_PLUGIN_NAME"\n" \
     " ---------------------------------------------------------------\n" \
     " The following parameters can be passed to this plugin:\n\n" \
-    " [-d | --delay ]........: delay to pause between frames\n" \
-    " [-r | --resolution]....: can be 960x720, 640x480, 320x240, 160x120\n"
+    " [-c | --camera ]........: camera id, 0 - front, 1 - bottom\n" \
+    " [-q | --quality]........: jpeg quality 1 - 100\n"
     " ---------------------------------------------------------------\n");
 }
 
@@ -323,7 +322,7 @@ void *worker_thread(void *arg)
     int ftstate = 0;
 
 
-    IplImage *testImage;    
+    IplImage *srcImage;    
     int count = 0;
 
     double start_time;
@@ -331,14 +330,14 @@ void *worker_thread(void *arg)
     while(!pglobal->stop) {
 
         /* copy JPG picture to global buffer */
-        if(pxget_imgfullwcheck(cameraid,&testImage) == 1) {
+        if(pxget_imgfullwcheck(cameraid,&srcImage) == 1) {
             if(ftstate == 1) {
                 int ftnum = pxget_imgfeature(ft,ftmax);
                 if(ftnum >= 0) {
                     for(i = 0;i < ftnum;i++) {
-                        cvCircle(testImage,cvPoint((int)ft[i].pcx,(int)ft[i].pcy),2,CV_RGB(255,255,0),1,8,0);
-                        cvCircle(testImage,cvPoint((int)ft[i].cx,(int)ft[i].cy),2,CV_RGB(0,255,0),1,8,0);
-                        cvLine(testImage,cvPoint((int)ft[i].pcx,(int)ft[i].pcy),cvPoint((int)ft[i].cx,(int)ft[i].cy),CV_RGB(0,0,255),1,8,0);
+                        cvCircle(srcImage,cvPoint((int)ft[i].pcx,(int)ft[i].pcy),2,CV_RGB(255,255,0),1,8,0);
+                        cvCircle(srcImage,cvPoint((int)ft[i].cx,(int)ft[i].cy),2,CV_RGB(0,255,0),1,8,0);
+                        cvLine(srcImage,cvPoint((int)ft[i].pcx,(int)ft[i].pcy),cvPoint((int)ft[i].cx,(int)ft[i].cy),CV_RGB(0,0,255),1,8,0);
                     }
                     ftstate = 0;
                 }
@@ -350,14 +349,14 @@ void *worker_thread(void *arg)
             tjhandle tj_compressor = tjInitCompress();
 
             double encoding_time = get_time();
-            if (tjCompress2(tj_compressor, (unsigned char*)testImage->imageData, 320, 0, 240, TJPF_BGR,
+            if (tjCompress2(tj_compressor, (unsigned char*)srcImage->imageData, 320, 0, 240, TJPF_BGR,
                       &(pglobal->in[plugin_number].buf), &buffsize, TJSAMP_420, jpegquality,
                       TJFLAG_NOREALLOC|TJFLAG_FASTDCT) == -1) {
                 printf("%s\n", tjGetErrorStr());
             }
             encoding_time = get_time() - encoding_time;
             if (count % 30 == 0) {
-              printf("%f: Image encoded, index: %d size: %ld encoding_time: %f\n", (get_time() - start_time)/1000.0,count++,buffsize, encoding_time);
+                printf("%f: Image encoded, index: %d size: %ld encoding_time: %f\n", (get_time() - start_time)/1000.0,count++,buffsize, encoding_time);
             }
 
             tjDestroy(tj_compressor);
